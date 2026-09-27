@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import requests, json, os
+import requests, json, os, time
 import tui
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 ### Default values
 
@@ -11,7 +11,7 @@ LEAGUE = "college-football"
 TEAMSFILE = "dataTeams.json"
 CHOSENTEAMS = "chosenTeams.json"
 URLV2 = f"https://site.api.espn.com/apis/site/v2/sports/{SPORT}/{LEAGUE}/"
-CDNURL = f"https://cdn.espn.com/core/{SPORT}/"
+CDNURL = f"https://cdn.espn.com/core/{LEAGUE}/"
 
 def clear():
     '''
@@ -139,16 +139,79 @@ def getGameSummary(event):
 
     return summary
 
+def getGameData(event):
+    """
+    Gets the game data for the given event with the fancy stuff"""
+    gameID = event["id"]
+    url = CDNURL + f"/game?xhr=1&gameId={gameID}"
+
+    summary = dataRequest(url)
+
+    return summary
+
 def scores(summary):
     '''
     Gets the scores from a given game summary
     '''
+    if "scoringPlays" not in summary:
+        return 0,0
+
     scoringPlays = summary["scoringPlays"]
 
     awayScore = scoringPlays[-1]["awayScore"]
     homeScore = scoringPlays[-1]["homeScore"]
 
     return awayScore, homeScore
+
+def plays(summary):
+    """
+    Gets all the plays from a given game summary
+    """
+
+    return summary["plays"]
+
+def trackGame(game):
+    """
+    For a given game, it will autonomously track that game live
+    """
+    startTime = datetime.fromisoformat(game["date"])
+    completed = False
+    score = (0,0)
+    clear()
+    
+    while not completed:
+        currTime = datetime.now(timezone.utc)
+        if currTime < startTime:
+            timeDiff = startTime - currTime
+            print(f"Game will begin in {timeDiff!s}")
+        else:
+            summary = getGameSummary(game)
+            teamsPlaying = summary["boxscore"]["teams"]
+            header = summary["header"]
+            status = header["competitions"][0]["status"]
+            statusType = status["type"]
+            completed = bool(statusType["completed"])
+            
+            for team in teamsPlaying:
+                if team["homeAway"] == "away":
+                    awayTeam = team["team"]
+                else:
+                    homeTeam = team["team"]
+            
+            newScore = scores(summary)
+
+            if newScore[0] != score[0] or newScore[1] != score[1]:
+                score = newScore
+                print(f"{awayTeam["abbreviation"]} @ {homeTeam["abbreviation"]} : {score[0]} - {score[1]}")
+                print(f"Time: {currTime}")
+
+
+        if not completed:
+            time.sleep(60)
+
+        if currTime < startTime:
+            clear()
+            print(game["name"])
 
 def main(league, lastWeek = True):
     # Get weekend dates
@@ -190,24 +253,9 @@ if __name__ == "__main__":
     
     events = [schedule["events"] for schedule in schedules]
 
+    currDate = datetime.today().day
+
     firstGames = [games[0] for games in events]
+    todayGames = [g for games in events for g in games if datetime.fromisoformat(g["date"]).day == currDate] 
 
-    summaries = [getGameSummary(firstGame) for firstGame in firstGames]
-
-    for summary in summaries:
-        teamsPlaying = summary["boxscore"]["teams"]
-
-        for team in teamsPlaying:
-            if team["homeAway"] == "away":
-                awayTeam = team["team"]
-            else:
-                homeTeam = team["team"]
-        
-        score = scores(summary)
-        print(f"{awayTeam["abbreviation"]} @ {homeTeam["abbreviation"]} : {score[0]} - {score[1]}")
-
-    #teams = getTeams()
-    #for team in pickTeam(teams):
-    #    print(team["displayName"])
-    #main(league)
-
+    trackGame(todayGames[0])
