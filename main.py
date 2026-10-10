@@ -235,7 +235,8 @@ def displayScore(games):
             header = summary["header"]
             status = header["competitions"][0]["status"]
             statusType = status["type"]
-            completed = completed and bool(statusType["completed"])
+            gameCompleted = bool(statusType["completed"])
+            completed = completed and gameCompleted
             
             for team in teamsPlaying:
                 if team["homeAway"] == "away":
@@ -244,7 +245,9 @@ def displayScore(games):
                     homeTeam = team["team"]
 
             score = scores(summary)
-            
+            gameState = "Final" if gameCompleted else "Current"
+
+            print(f"{gameState} Score")
             print(f"{awayTeam["abbreviation"]} @ {homeTeam["abbreviation"]} : {score[0]} - {score[1]}")
         print(f"Time: {currTime}")
         print(LINEBREAK)
