@@ -12,6 +12,7 @@ TEAMSFILE = "dataTeams.json"
 CHOSENTEAMS = "chosenTeams.json"
 URLV2 = f"https://site.api.espn.com/apis/site/v2/sports/{SPORT}/{LEAGUE}/"
 CDNURL = f"https://cdn.espn.com/core/{LEAGUE}/"
+LINEBREAK = "#"*40
 
 def clear():
     '''
@@ -183,7 +184,7 @@ def trackGame(game):
         currTime = datetime.now(timezone.utc)
         if currTime < startTime:
             timeDiff = startTime - currTime
-            print(f"Game will begin in {timeDiff!s}")
+            print(f"{game["name"]} will begin in {timeDiff!s}")
         else:
             summary = getGameSummary(game)
             teamsPlaying = summary["boxscore"]["teams"]
@@ -212,6 +213,54 @@ def trackGame(game):
         if currTime < startTime:
             clear()
             print(game["name"])
+
+def displayScore(games):
+    """
+    Displays the current score for the given games
+    """
+    print(LINEBREAK)
+    currTime = datetime.now(timezone.utc)
+    completed = True
+    
+    for game in games:
+        startTime = datetime.fromisoformat(game["date"])
+        print(game["name"])
+        if currTime < startTime:
+            timeDiff = startTime - currTime
+            print(f"Game will begin in {timeDiff!s}")
+            completed = False
+        else:
+            summary = getGameSummary(game)
+            teamsPlaying = summary["boxscore"]["teams"]
+            header = summary["header"]
+            status = header["competitions"][0]["status"]
+            statusType = status["type"]
+            completed = completed and bool(statusType["completed"])
+            
+            for team in teamsPlaying:
+                if team["homeAway"] == "away":
+                    awayTeam = team["team"]
+                else:
+                    homeTeam = team["team"]
+
+            score = scores(summary)
+            
+            print(f"{awayTeam["abbreviation"]} @ {homeTeam["abbreviation"]} : {score[0]} - {score[1]}")
+        print(f"Time: {currTime}")
+        print(LINEBREAK)
+
+    return completed
+
+def trackGames(games):
+    """
+    Tracks multiple games throughout the day
+    """
+    completed = False
+
+    while not completed:
+        clear()
+        completed = displayScore(games)
+        time.sleep(60)
 
 def main(league, lastWeek = True):
     # Get weekend dates
@@ -258,4 +307,4 @@ if __name__ == "__main__":
     firstGames = [games[0] for games in events]
     todayGames = [g for games in events for g in games if datetime.fromisoformat(g["date"]).day == currDate] 
 
-    trackGame(todayGames[0])
+    trackGames(todayGames)
