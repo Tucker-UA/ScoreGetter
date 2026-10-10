@@ -218,19 +218,27 @@ def displayScore(games):
     """
     Displays the current score for the given games
     """
-    print(LINEBREAK)
     currTime = datetime.now(timezone.utc)
     completed = True
-    
+
+    # Game Start Times
+    startTimes = {game["name"] : datetime.fromisoformat(game["date"]) for game in games}
+   
+    # Preload game summaries so that there isn't a noticeable screenwipe
+    summaries = {game["name"] : getGameSummary(game) for game in games if startTimes[game["name"]] <= currTime} 
+
+    clear() # Clears screen here so it instantly displays info
+    print(LINEBREAK)
+
     for game in games:
-        startTime = datetime.fromisoformat(game["date"])
         print(game["name"])
+        startTime = startTimes[game["name"]]
         if currTime < startTime:
             timeDiff = startTime - currTime
             print(f"Game will begin in {timeDiff!s}")
             completed = False
         else:
-            summary = getGameSummary(game)
+            summary = summaries[game["name"]]
             teamsPlaying = summary["boxscore"]["teams"]
             header = summary["header"]
             status = header["competitions"][0]["status"]
@@ -261,7 +269,6 @@ def trackGames(games):
     completed = False
 
     while not completed:
-        clear()
         completed = displayScore(games)
         time.sleep(60)
 
